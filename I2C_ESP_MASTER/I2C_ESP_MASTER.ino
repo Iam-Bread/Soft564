@@ -1,43 +1,71 @@
 #include <Wire.h>
-//
-//#define arduinoUno 4
-//
-//void setup() {
-//  Serial.begin(115200);
-//  //start i2c bus
-//  Wire.begin(); //i2c start with default pins 21 and 22
-//  bool status;
-//
-//  //check if arduino is connected
-//  status = Wire.begin(arduinoUno);  
-//  if (!status) {
-//    Serial.println("Could not find Arduino Uno, check wiring!");
-//    while (1);
-//  }
-//  Serial.println("-- Default Test --");
-//}
-//
-//byte x = 0;
-//
-//void loop()
-//{
-//  Wire.beginTransmission(4); // transmit to device #4
-//  Wire.write(x);              // sends one byte  
-//  Wire.endTransmission();    // stop transmitting
-// Serial.println(x);
-//  x++;
-//  delay(500);
-//}
-int x = 0;
+
+#define uno 5
+
+#define motor_stop 0xF0
+#define motor_forward 0xF2
+#define motor_left 0xF3
+#define motor_light 0xF4
+#define get_sensData 0xA0
+#define move_server 0xB0
+
+
 void setup() {
   // Start the I2C Bus as Master
   Wire.begin(); 
+  Serial.begin(115200);  
 }
+char inputBuffer[1];
+byte number = 0;
+
 void loop() {
-  Wire.beginTransmission(9); // transmit to device #9
-  Wire.write(x);              // sends x 
+
+
+  if (Serial.available() > 0) {
+
+    Serial.readBytesUntil('\n', inputBuffer, 1);
+    number = atoi(inputBuffer);
+    Serial.print("Number to display: ");
+    Serial.println(inputBuffer);
+  }
+
+  
+  Wire.beginTransmission(uno); // transmit to device #4
+  Wire.write(byte(motor_stop));              // sends one byte  
   Wire.endTransmission();    // stop transmitting
-  x++; // Increment x
-  if (x > 5) x = 0; // `reset x once it gets 6
+  
+  Wire.requestFrom(uno, 6);    // request 6 bytes from slave device #8
+  
+  while (Wire.available()) { // slave may send less than requested
+    char c = Wire.read(); // receive a byte as character
+    Serial.print(c);         // print the character
+  }
+  delay(500);
+
+//
+//   Wire.beginTransmission(uno); // transmit to device #9
+//  Wire.write(byte(motor_forward));              // sends x 
+//  Wire.endTransmission();    // stop transmitting
+//
+//  Wire.requestFrom(uno, 6);    // request 6 bytes from slave device #8
+//  
+//  while (Wire.available()) { // slave may send less than requested
+//    char c = Wire.read(); // receive a byte as character
+//    Serial.print(c);         // print the character
+//  }
+//
+//  delay(500);
+//
+//  Wire.beginTransmission(uno); // transmit to device #9
+//  Wire.write(byte(get_sensData));              // sends x 
+//  Wire.endTransmission();    // stop transmitting
+
+//  Wire.requestFrom(uno, 6);    // request 6 bytes from slave device #8
+//  
+//  while (Wire.available()) { // slave may send less than requested
+//    char c = Wire.read(); // receive a byte as character
+//    Serial.print(c);         // print the character
+//  }
+
   delay(500);
 }
