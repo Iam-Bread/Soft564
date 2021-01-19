@@ -7,9 +7,22 @@
 //12c pins
 #define I2C_SDA 21
 #define I2C_SCL 22
-#define arduinoUno 5
-//create i2c bus
-TwoWire I2C = TwoWire(0);
+#define uno 5
+
+//commands to slave
+#define motor_stop 0xF0
+#define motor_forward 0xF1
+#define motor_backward 0xF2
+#define motor_left 0xF3
+#define motor_right 0xF4
+
+#define motor_forwardStop 0xF5
+#define motor_backwardStop 0xF6
+#define motor_leftStop 0xF7
+#define motor_rightStop 0xF8
+
+#define get_sensData 0xA0
+#define move_server 0xB0
 
 unsigned long delayTime;
 
@@ -35,10 +48,14 @@ bool forwardState = false;
 bool backwardState = false;
 bool leftState = false;
 bool rightState = false;
+bool getSensState = false;
 
-// Assign output variables to GPIO pins
-const int output26 = 26;
-const int output27 = 27;
+
+char dhtdata[10];
+char temperature[6];
+char humidity[6];
+
+
 
 // Current time
 unsigned long currentTime = millis();
@@ -48,6 +65,8 @@ unsigned long previousTime = 0;
 const long timeoutTime = 2000;
 
 void setup() {
+  // Start the I2C Bus
+  Wire.begin(); 
   Serial.begin(115200);
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
@@ -67,6 +86,7 @@ void setup() {
 
 void loop(){
 webpage();
+
 }
 
 void webpage(){
@@ -100,35 +120,99 @@ void webpage(){
               Serial.println("Move forwards");
               forwardState = true;  
               backwardState = false;   
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_forward));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting
             } else if (header.indexOf("GET /forward/false") >= 0) {
               Serial.println("Stop moving forwards");
-              forwardState = false;            
+              forwardState = false;      
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_forwardStop));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting      
             } 
             if (header.indexOf("GET /left/true") >= 0) {
               Serial.println("turn left");
               leftState = true;   
               rightState = false;   
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_left));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting
             } else if (header.indexOf("GET /left/false") >= 0) {
               Serial.println("Stop turning left");
-              leftState = false;            
+              leftState = false;    
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_leftStop));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting        
             } 
             if (header.indexOf("GET /backward/true") >= 0) {
               Serial.println("Move backwards");
               backwardState = true;    
               forwardState = false;
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_backward));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting
             } else if (header.indexOf("GET /backward/false") >= 0) {
               Serial.println("Stop moving backwards");
-              backwardState = false;            
+              backwardState = false;     
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_backwardStop));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting       
             } 
             if (header.indexOf("GET /right/true") >= 0) {
               Serial.println("turn right");
               rightState = true;   
               leftState = false;  
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_right));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting
             } else if (header.indexOf("GET /right/false") >= 0) {
               Serial.println("Stop turning right");
-              rightState = false;            
+              rightState = false;      
+                Wire.beginTransmission(uno); // transmit to device #4
+                Wire.write(byte(motor_rightStop));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting      
+            } 
+//            if (forwardState == false && backwardState == false && leftState == false && rightState == false){
+//                Wire.beginTransmission(uno); // transmit to device #4
+//                Wire.write(byte(motor_stop));              // sends one byte  
+//                Wire.endTransmission();    // stop transmitting
+//             }
+
+
+           if (header.indexOf("GET /getSens/true") >= 0) {
+              Serial.println("Get sens");
+              getSensState = true;   
+            } else if (header.indexOf("GET /getSens/false") >= 0) {
+              Serial.println("stop get sens");
+              getSensState = false;      
             } 
 
+
+            if(getSensState == true){
+                Wire.beginTransmission(uno); // transmit to device 
+                Wire.write(byte(get_sensData));              // sends one byte  
+                Wire.endTransmission();    // stop transmitting    
+                Wire.requestFrom(uno, 10);    // request 10 bytes from slave device
+  
+            //get all data from slave
+            for(int i=0; i <10; i++){
+                dhtdata[i] = Wire.read();
+              }
+                  Serial.println(dhtdata);
+              //split data up into temperature and humidity
+               for(int i =0; i<5; i++) { 
+                  temperature[i] = dhtdata[i]; // receive a byte as character    
+                        
+                }
+               for(int i =0; i<5; i++) { 
+                  humidity[i] = dhtdata[i+5]; // receive a byte as character      
+                    
+                }
+                Serial.println(temperature); 
+               Serial.println(humidity); 
+               
+                getSensState = false;                  
+              }
 
             
             // Display the HTML
@@ -179,7 +263,19 @@ void webpage(){
           
            client.println("</p>");
 
-
+           
+           client.println("<p style='text-align:center;'>");
+             if(!getSensState){
+                client.println("<a href=\"/getSens/true\"><button class=\"button\">Get Sensor Data</button></a>");
+                client.println("</p>");
+                client.println("<pstyle='text-align:center;'> Temperature: ");
+                client.println(temperature);
+                client.println(" Humidity: ");
+                client.println(humidity);
+            }else{
+              client.println("<a href=\"/getSens/false\"><button class=\"button2\">Get Sensor Data</button></a>");
+              client.println("</p>");
+            }
 
             client.println("</body></html>");
 

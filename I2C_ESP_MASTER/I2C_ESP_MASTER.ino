@@ -31,10 +31,10 @@ void loop() {
 
   
   Wire.beginTransmission(uno); // transmit to device #4
-  Wire.write(byte(motor_stop));              // sends one byte  
+  Wire.write(byte(get_sensData));              // sends one byte  
   Wire.endTransmission();    // stop transmitting
   
-  Wire.requestFrom(uno, 6);    // request 6 bytes from slave device #8
+  Wire.requestFrom(uno, 12);    // request 6 bytes from slave device #8
   
   while (Wire.available()) { // slave may send less than requested
     char c = Wire.read(); // receive a byte as character
