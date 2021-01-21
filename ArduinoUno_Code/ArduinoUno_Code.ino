@@ -33,6 +33,7 @@ HCSR04 ultraSonic(trig, echo); //create ultrasonic object
 
 int servoPos = 90;  //defualt servo position
 bool servoMoved = false;
+bool dhtRetrieved = false;
 byte command = 0;
 
 
@@ -63,7 +64,9 @@ void receiveEvent(int bytes) {
  if (command == move_servo) {
     servoPos = buf[1];
      servoMoved = false;
-  }
+  }else if( command == get_sensData){
+        dhtRetrieved = false;
+    }
 
 }
 
@@ -72,15 +75,20 @@ void requestEvent() {
     Serial.println("sending dht");
     Wire.write(dhtemperature);
     Wire.write(dhthumidity);
-  }
+  }else if(command == move_servo){
+        Wire.write(usDistance); 
+    }
   
 }
 
 void loop() {
-  if (command == get_sensData) {
-    getDHT();
+  
+  
+  if (command == get_sensData && dhtRetrieved == false) {
     Serial.println(dhtemperature);
     Serial.println(dhthumidity);
+    getDHT();
+    dhtRetrieved = true;
   }else if(command == move_servo && servoMoved == false){
     servoBuggy.write(servoPos);
     getUS();
@@ -109,8 +117,6 @@ void getDHT() {
   //store values in char array
   dtostrf(t, 5, 2, dhtemperature);
   dtostrf(h, 5, 2, dhthumidity);
-
-
 
   // Check if any reads failed
   if (isnan(h) || isnan(t)) {

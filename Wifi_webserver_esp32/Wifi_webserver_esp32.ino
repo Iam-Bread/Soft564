@@ -49,12 +49,13 @@ bool backwardState = false;
 bool leftState = false;
 bool rightState = false;
 bool getSensState = false;
+bool servoState = false;
 
 
-String servoPosition = String(5);
+String servoPosition = String(90);
 int pos1 = 0;
 int pos2 = 0;
-
+char ultraSonicDist[6] = "00000";
 
 char dhtdata[10];
 char temperature[6];
@@ -198,6 +199,7 @@ void webpage() {
               Wire.beginTransmission(uno); // transmit to device
               Wire.write(byte(get_sensData));              // sends one byte
               Wire.endTransmission();    // stop transmitting
+
               Wire.requestFrom(uno, 10);    // request 10 bytes from slave device
               
               //get all data from slave
@@ -219,6 +221,32 @@ void webpage() {
 
 
 
+            
+          //GET /?value=180& HTTP/1.1
+            if (header.indexOf("GET /?value=") >= 0) {
+              pos1 = header.indexOf('=');
+              pos2 = header.indexOf('&');
+              servoPosition = header.substring(pos1 + 1, pos2);
+              Serial.println(servoPosition);
+           
+              Wire.beginTransmission(uno); // transmit to device #4
+              Wire.write(byte(move_servo));              // sends one byte
+              int servoPosInt = servoPosition.toInt();  //convert slider position to int 
+               Wire.write(servoPosInt); //send servo position to slave
+              Wire.endTransmission();    // stop transmitting
+              delay(100);   //gives time to slave to get data ready
+              Wire.requestFrom(uno, 6);    // request 10 bytes from slave device
+              
+              //get all data from slave
+              for (int i = 0; i < 5; i++) {
+                ultraSonicDist[i] = Wire.read();
+              }
+              Serial.println(ultraSonicDist);
+
+            
+             }
+
+
             // Display the HTML
             client.println("<!DOCTYPE html><html>");
             client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
@@ -226,7 +254,7 @@ void webpage() {
 
             client.println("<style>");
 
-            client.println(".button2 {background-color: #4CAF50; color: white; padding: 16px 40px;}");
+            client.println(".button2 {background-color: #008B8B; color: white; padding: 16px 40px;}");
             client.println(".button {background-color: #555555; color: white; padding: 16px 40px;}");
 
             client.println("</style>");
@@ -275,8 +303,10 @@ void webpage() {
               client.println("</p>");
               client.println("<p style='text-align:center;'> Temperature: ");
               client.println(temperature);
+              client.println("'C");
               client.println(" Humidity: ");
               client.println(humidity);
+              client.println("%");
               client.println("</p>");
             } else {
               client.println("<p style='text-align:center;'>");
@@ -290,35 +320,26 @@ void webpage() {
             client.println(".slider { width: 300px; }</style>");
             client.println("<p>Servo Position: <span id=\"servoPos\"></span></p>");
             client.println("<input type=\"range\" min=\"0\" max=\"180\" class=\"slider\" id=\"servoSlider\" onchange=\"servo(this.value)\" value=\"" + servoPosition + "\"/>");
+                // String usDisString = ultraSonicDist;
+           // Serial.println(usDisString);
+           client.println("<div id=\"dis\">");
+            client.println("<p>Distance: ");
+            client.print(ultraSonicDist);
+            client.print("</p>");
+            client.println("</div >");
+   
+       
+
             client.println("<script>var slider = document.getElementById(\"servoSlider\");");
             client.println("var servoP = document.getElementById(\"servoPos\"); servoP.innerHTML = slider.value;");
-            client.println("slider.oninput = function() { slider.value = this.value; servoP.innerHTML = this.value; }");
+            client.println("slider.oninput = function() { slider.value = this.value; servoP.innerHTML = this.value;}");
             client.println("$.ajaxSetup({timeout:1000}); function servo(pos) { ");
-            client.println("$.get(\"/?value=\" + pos + \"&\"); {Connection: close};}</script>");
+            client.println("$.get(\"/?value=\" + pos + \"&\"); $( \"#dis\" ).load(window.location.href + \" #dis\" ); {Connection: close};}</script>");   //gets value of slider and refreshes  distance div to load the 
 
+            
 
-
+ 
             client.println("</body></html>");
-
-            //GET /?value=180& HTTP/1.1
-            if (header.indexOf("GET /?value=") >= 0) {
-              pos1 = header.indexOf('=');
-              pos2 = header.indexOf('&');
-              servoPosition = header.substring(pos1 + 1, pos2);
-              Serial.println(servoPosition);
-              
-              Wire.beginTransmission(uno); // transmit to device #4
-              Wire.write(byte(move_servo));              // sends one byte
-
-              int servoPosInt = servoPosition.toInt();
-               Wire.write(servoPosInt);
-              Wire.endTransmission();    // stop transmitting
-
-            }
-
-            //   client.println("</p>");
-
-            //  client.println("</body></html>");
 
 
             // The HTTP response ends with another blank line
