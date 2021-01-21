@@ -1,10 +1,16 @@
-#include <Wire.h>
-#include "DHT.h"
+#include <Wire.h>   //used for i2c
+#include <Servo.h>  //servo control library 
+
+#include <HCSR04.h> //library for ultrasonic
+#include "DHT.h"  //library for temp/humidity sensor
 
 #define uno 5
 
-#define DHTPIN A0
+#define DHTPIN A2
 #define DHTTYPE DHT11
+#define servoHeader A3
+#define trig A0
+#define echo A1
 
 //commands to slave
 #define motor_stop 0xF0
@@ -19,105 +25,91 @@
 #define motor_rightStop 0xF8
 
 #define get_sensData 0xA0
-#define move_server 0xB0
+#define move_servo 0xB0
 
-DHT dht(DHTPIN, DHTTYPE);
+DHT dht(DHTPIN, DHTTYPE); //create dht object
+Servo servoBuggy; // create servo object
+HCSR04 ultraSonic(trig, echo); //create ultrasonic object
 
+int servoPos = 90;  //defualt servo position
+bool servoMoved = false;
 byte command = 0;
-bool sensGot = false;
+
 
 char dhtemperature[6];
 char dhthumidity[6];
+char usDistance[6];
+byte buf[3];
 
 
 void setup() {
-   dht.begin(); 
-
+  dht.begin();
+  servoBuggy.attach(servoHeader); //attach servo object onto gpio
+  getDHT();
   // Start the I2C Bus as Slave on address 9
-  Wire.begin(uno); 
+  Wire.begin(uno);
   // Attach a function to trigger when something is received.
   Wire.onReceive(receiveEvent);
- Wire.onRequest(requestEvent);
-  Serial.begin(115200);   
+  Wire.onRequest(requestEvent);
+  Serial.begin(115200);
 }
 void receiveEvent(int bytes) {
 
-  while(Wire.available()) // loop through all but the last
-  {
-     command = Wire.read();    // read one character from the I2C
-     Serial.println(command,HEX);  
-  }
-  if(command == get_sensData){
-    sensGot = false;
-   // Serial.println("BOOL SET FALSE");
+  int n = Wire.available();
+  Wire.readBytes(buf, n);
+  command = buf[0];    // read one character from the I2C
+  Serial.println(command, HEX);
 
-
-
-
+ if (command == move_servo) {
+    servoPos = buf[1];
+     servoMoved = false;
   }
 
 }
 
 void requestEvent() {
-//  if(command == motor_stop){
-//    Wire.write("stopp "); // respond with message of 6 bytes
-//    Serial.println("motor stop");
-//  }else if(command == motor_forward){
-//    Wire.write("forwa ");
-//    Serial.println("motor forward");
-//  }else 
-
-if(command == get_sensData){
-       Serial.println("sending dht");  
-
+  if (command == get_sensData) {
+    Serial.println("sending dht");
     Wire.write(dhtemperature);
     Wire.write(dhthumidity);
   }
-  // as expected by master
+  
 }
 
 void loop() {
-
-  delay(500);
-
-   if(command == get_sensData && sensGot == false){  //checks if data has already been collected otherwise would get stuck
-
+  if (command == get_sensData) {
     getDHT();
-    sensGot = true;
-  Serial.println(dhtemperature);
-  Serial.println(dhthumidity);
-  
-
-
-  }
+    Serial.println(dhtemperature);
+    Serial.println(dhthumidity);
+  }else if(command == move_servo && servoMoved == false){
+    servoBuggy.write(servoPos);
+    getUS();
+   
+    Serial.println(servoPos);
+    servoMoved = true;
+   }
 
 }
 
-//void getDHT(char *allSensData){
-  //void getDHT(char *tempd, char *humd){
-  void getDHT(){
-   //read humidity
+void getUS() {
+  float distance = ultraSonic.dist();
+  if (distance > 99.99) {
+    distance = 99.99;
+  }
+  dtostrf(distance, 5, 2, usDistance);
+   Serial.println(distance);
+}
+
+void getDHT() {
+  //read humidity
   float h = dht.readHumidity();
   //read temperature
   float t = dht.readTemperature();
-  
 
-//  char sensDataH[5] = "";           //create char arrays to store temp and humidity
-//  char sensDataT[5] = "";
-//  allSensData[11] = "";
- // Serial.println(t);
-    dtostrf(t, 5, 2, dhtemperature);
-    dtostrf(h, 5, 2, dhthumidity);
- // Serial.println(dhtemperature);
-    
-//  dtostrf(t, 5, 2, sensDataT);  //convert float to char array
-//  strcpy(allSensData,sensDataT); //copy array into larger array
-//  strcat(allSensData," ");      //concatante space
-//  dtostrf(h, 5, 2, sensDataH);  //convert float to char array
-//  strcat(allSensData,sensDataH);  //concatanate array onto end of bigger array
-//  strcat(allSensData,'\0');
-//  //allSensData[11] = '\0';         //terminate array  to avoid unwanted characters
-//  Serial.println(allSensData);
+  //store values in char array
+  dtostrf(t, 5, 2, dhtemperature);
+  dtostrf(h, 5, 2, dhthumidity);
+
 
 
   // Check if any reads failed
@@ -126,12 +118,4 @@ void loop() {
     return;
   }
 
-//return allSensData;
-////print temperature and humidity
-//  Serial.print(F("Humidity: "));
-//  Serial.print(h);
-//  Serial.print(F("%  Temperature: "));
-//  Serial.print(t);
-//  Serial.println(F("°C "));
-
-  }
+}
