@@ -1,8 +1,6 @@
-// Load Wi-Fi library
-#include <WiFi.h>
-
-#include <Wire.h>
-
+#include <WiFi.h> //wifi libray for server and connecting to socket
+#include <Wire.h>   //wire library used for i2c
+#include <LiquidCrystal_I2C.h>    //lcd library for sending commands over i2c 
 
 //12c pins
 #define I2C_SDA 21
@@ -26,8 +24,10 @@
 
 unsigned long delayTime;
 
-
-
+// set the LCD number of columns and rows
+int lcdColumns = 16;
+int lcdRows = 2;
+LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);  //create lcd object
 
 // Replace with your network credentials
 const char* ssid = "Linksys15538";
@@ -74,20 +74,27 @@ void setup() {
   // Start the I2C Bus
   Wire.begin();
   Serial.begin(115200);
+  lcd.init();// initialize LCD                 
+  lcd.backlight();// turn on LCD backlight   
+  lcd.setCursor(0, 0); 
+  
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
+  lcd.print("Connecting-Wifi");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
+  lcd.clear();
   // Print local IP address and start web server
   Serial.println("");
   Serial.println("WiFi connected.");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
   server.begin();
+  lcd.print(WiFi.localIP());
 }
 
 void loop() {
@@ -126,6 +133,8 @@ void webpage() {
               Serial.println("Move forwards");
               forwardState = true;
               backwardState = false;
+              leftState = false;
+              rightState = false;
               Wire.beginTransmission(uno); // transmit to device #4
               Wire.write(byte(motor_forward));              // sends one byte
               Wire.endTransmission();    // stop transmitting
@@ -140,6 +149,8 @@ void webpage() {
               Serial.println("turn left");
               leftState = true;
               rightState = false;
+              forwardState = false;
+              backwardState = false;
               Wire.beginTransmission(uno); // transmit to device #4
               Wire.write(byte(motor_left));              // sends one byte
               Wire.endTransmission();    // stop transmitting
@@ -154,6 +165,8 @@ void webpage() {
               Serial.println("Move backwards");
               backwardState = true;
               forwardState = false;
+              leftState = false;
+              rightState = false;
               Wire.beginTransmission(uno); // transmit to device #4
               Wire.write(byte(motor_backward));              // sends one byte
               Wire.endTransmission();    // stop transmitting
@@ -168,6 +181,8 @@ void webpage() {
               Serial.println("turn right");
               rightState = true;
               leftState = false;
+              forwardState = false;
+              backwardState = false;
               Wire.beginTransmission(uno); // transmit to device #4
               Wire.write(byte(motor_right));              // sends one byte
               Wire.endTransmission();    // stop transmitting
@@ -216,6 +231,14 @@ void webpage() {
               }
               Serial.println(temperature);
               Serial.println(humidity);
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("T: ");
+              lcd.print(temperature);
+              lcd.setCursor(0,1);
+              lcd.print("H: ");
+              lcd.print(humidity);
+
               getSensState = false;     //Set state back to false so it doesnt run continuosly
             }
 
@@ -242,7 +265,10 @@ void webpage() {
                 ultraSonicDist[i] = Wire.read();
               }
               Serial.println(ultraSonicDist);
-
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Dist: ");
+              lcd.print(ultraSonicDist);
             
              }
 
@@ -299,7 +325,7 @@ void webpage() {
 
             if (!getSensState) {
               client.println("<p style='text-align:center;'>");
-              client.println("<a href=\"/getSens/true\"><button class=\"button\">Get Sensor Data</button></a>");
+              client.println("<a href=\"/getSens/true\"><button class=\"button2\">Get Sensor Data</button></a>");
               client.println("</p>");
               client.println("<p style='text-align:center;'> Temperature: ");
               client.println(temperature);
@@ -310,7 +336,7 @@ void webpage() {
               client.println("</p>");
             } else {
               client.println("<p style='text-align:center;'>");
-              client.println("<a href=\"/getSens/false\"><button class=\"button2\">Get Sensor Data</button></a>");
+              client.println("<a href=\"/getSens/false\"><button class=\"button\">Get Sensor Data</button></a>");
               client.println("</p>");
             }
 
