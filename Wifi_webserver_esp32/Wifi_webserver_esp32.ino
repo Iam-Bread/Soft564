@@ -1,4 +1,5 @@
 #include <WiFi.h> //wifi libray for server and connecting to socket
+#include "BluetoothSerial.h"  //bluetooth serial library
 #include <Wire.h>   //wire library used for i2c
 #include <LiquidCrystal_I2C.h>    //lcd library for sending commands over i2c 
 
@@ -35,15 +36,13 @@ const char* password = "u75c00bxle";
 
 // Set web server port number to 80
 WiFiServer server(80);
+BluetoothSerial BlueTooth; //bluetooth object
 
 // Variable to store the HTTP request
 String header;
 
-// Auxiliar variables to store the current output state
-String output26State = "off";
-String output27State = "off";
 
-
+//state flags
 bool forwardState = false;
 bool backwardState = false;
 bool leftState = false;
@@ -61,51 +60,71 @@ char dhtdata[10];
 char temperature[6];
 char humidity[6];
 
-
+char bluetoothData[20]; //incoming bluetooth data
 
 // Current time
 unsigned long currentTime = millis();
 // Previous time
 unsigned long previousTime = 0;
-// Define timeout time in milliseconds (example: 2000ms = 2s)
-const long timeoutTime = 2000;
+// Define timeout time in milliseconds
+const long timeoutTime = 10000;
+
+void bluetooth();
+void webpage();
+void servoMove(int servoPos);
+void getDHT_Data();
 
 void setup() {
   // Start the I2C Bus
   Wire.begin();
   Serial.begin(115200);
-  lcd.init();// initialize LCD                 
-  lcd.backlight();// turn on LCD backlight   
-  lcd.setCursor(0, 0); 
-  
+  lcd.init();// initialize LCD
+  lcd.backlight();// turn on LCD backlight
+  lcd.setCursor(0, 0);
+
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password);
   lcd.print("Connecting-Wifi");
-  while (WiFi.status() != WL_CONNECTED) {
+  uint32_t moment = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - moment < 8000)) { //timeout if it cant coonect to wifi
     delay(500);
     Serial.print(".");
   }
   lcd.clear();
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-  server.begin();
-  lcd.print(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {            //if connected to wifi
+    // Print local IP address and start web server
+    Serial.println("");
+    Serial.println("WiFi connected.");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    server.begin();
+    lcd.print(WiFi.localIP());
+  } else {       //if not connected to wifi
+    Serial.println("cant connect to WiFi");
+    lcd.print("   Connect to   ");
+    lcd.setCursor(0, 1);
+    lcd.print("    Bluetooth   ");
+    BlueTooth.begin("Soft564 Robot");
+    Serial.println("connect via BlueTooth");
+  }
 }
 
 void loop() {
-  webpage();
+  if (WiFi.status() == WL_CONNECTED) {  //if connected to wifi
+    webpage();
+  } else {
 
+    bluetooth();
+
+  }
 }
 
 void webpage() {
   WiFiClient client = server.available();   // Listen for incoming clients
 
-  if (client) {                             // If a new client connects,
+  if (client) {                             // If a new client connects
     currentTime = millis();
     previousTime = currentTime;
     Serial.println("New Client.");          // print a message out in the serial port
@@ -128,7 +147,7 @@ void webpage() {
             client.println();
 
 
-
+            //ARROW KEY DIRECTIONS
             if (header.indexOf("GET /forward/true") >= 0) {
               Serial.println("Move forwards");
               forwardState = true;
@@ -193,11 +212,6 @@ void webpage() {
               Wire.write(byte(motor_rightStop));              // sends one byte
               Wire.endTransmission();    // stop transmitting
             }
-            //            if (forwardState == false && backwardState == false && leftState == false && rightState == false){
-            //                Wire.beginTransmission(uno); // transmit to device #4
-            //                Wire.write(byte(motor_stop));              // sends one byte
-            //                Wire.endTransmission();    // stop transmitting
-            //             }
 
 
             //DHT SENSOR DATA UPDATE STATE IF BUTTON PRESSED
@@ -211,66 +225,21 @@ void webpage() {
 
             //SEND SLAVE COMMAND THEN REQUEST DATA BACK
             if (getSensState == true) {
-              Wire.beginTransmission(uno); // transmit to device
-              Wire.write(byte(get_sensData));              // sends one byte
-              Wire.endTransmission();    // stop transmitting
-
-              Wire.requestFrom(uno, 10);    // request 10 bytes from slave device
-              
-              //get all data from slave
-              for (int i = 0; i < 10; i++) {
-                dhtdata[i] = Wire.read();
-              }
-              Serial.println(dhtdata);
-              //split data up into temperature and humidity
-              for (int i = 0; i < 5; i++) {
-                temperature[i] = dhtdata[i]; // receive a byte as character
-              }
-              for (int i = 0; i < 5; i++) {
-                humidity[i] = dhtdata[i + 5]; // receive a byte as character
-              }
-              Serial.println(temperature);
-              Serial.println(humidity);
-              lcd.clear();
-              lcd.setCursor(0,0);
-              lcd.print("T: ");
-              lcd.print(temperature);
-              lcd.setCursor(0,1);
-              lcd.print("H: ");
-              lcd.print(humidity);
-
+              getDHT_Data();
               getSensState = false;     //Set state back to false so it doesnt run continuosly
             }
 
-
-
-            
-          //GET /?value=180& HTTP/1.1
+            //GET /?value=180& HTTP/1.1
             if (header.indexOf("GET /?value=") >= 0) {
               pos1 = header.indexOf('=');
               pos2 = header.indexOf('&');
               servoPosition = header.substring(pos1 + 1, pos2);
               Serial.println(servoPosition);
-           
-              Wire.beginTransmission(uno); // transmit to device #4
-              Wire.write(byte(move_servo));              // sends one byte
-              int servoPosInt = servoPosition.toInt();  //convert slider position to int 
-               Wire.write(servoPosInt); //send servo position to slave
-              Wire.endTransmission();    // stop transmitting
-              delay(100);   //gives time to slave to get data ready
-              Wire.requestFrom(uno, 6);    // request 10 bytes from slave device
-              
-              //get all data from slave
-              for (int i = 0; i < 5; i++) {
-                ultraSonicDist[i] = Wire.read();
-              }
-              Serial.println(ultraSonicDist);
-              lcd.clear();
-              lcd.setCursor(0,0);
-              lcd.print("Dist: ");
-              lcd.print(ultraSonicDist);
-            
-             }
+              int servoPosInt = servoPosition.toInt();  //convert slider position to int
+              servoMove(servoPosInt);
+
+
+            }
 
 
             // Display the HTML
@@ -280,12 +249,10 @@ void webpage() {
 
             client.println("<style>");
 
-            client.println(".button2 {background-color: #008B8B; color: white; padding: 16px 40px;}");
+            client.println(".button2 {background-color: #008B8B; color: white; padding: 16px 40px;}");    //button style
             client.println(".button {background-color: #555555; color: white; padding: 16px 40px;}");
 
             client.println("</style>");
-
-
 
             client.println("</head>");
 
@@ -341,30 +308,25 @@ void webpage() {
             }
 
             //SLIDER CODE
-            client.println("<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script>");
+            client.println("<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js\"></script>");   //ajax google api
             client.println("<style>body { text-align: center; font-family: \"Trebuchet MS\", Arial; margin-left:auto; margin-right:auto;}");
             client.println(".slider { width: 300px; }</style>");
             client.println("<p>Servo Position: <span id=\"servoPos\"></span></p>");
-            client.println("<input type=\"range\" min=\"0\" max=\"180\" class=\"slider\" id=\"servoSlider\" onchange=\"servo(this.value)\" value=\"" + servoPosition + "\"/>");
-                // String usDisString = ultraSonicDist;
-           // Serial.println(usDisString);
-           client.println("<div id=\"dis\">");
+            client.println("<input type=\"range\" min=\"0\" max=\"180\" class=\"slider\" id=\"servoSlider\" onchange=\"servo(this.value)\" value=\"" + servoPosition + "\"/>");   //slider input type position set to servo pos 
+            
+            //displays ultrasonic distance
+            client.println("<div id=\"dis\">"); //div gets updated by 
             client.println("<p>Distance: ");
             client.print(ultraSonicDist);
             client.print("</p>");
             client.println("</div >");
-   
-       
 
             client.println("<script>var slider = document.getElementById(\"servoSlider\");");
             client.println("var servoP = document.getElementById(\"servoPos\"); servoP.innerHTML = slider.value;");
             client.println("slider.oninput = function() { slider.value = this.value; servoP.innerHTML = this.value;}");
             client.println("$.ajaxSetup({timeout:1000}); function servo(pos) { ");
-            client.println("$.get(\"/?value=\" + pos + \"&\"); $( \"#dis\" ).load(window.location.href + \" #dis\" ); {Connection: close};}</script>");   //gets value of slider and refreshes  distance div to load the 
+            client.println("$.get(\"/?value=\" + pos + \"&\"); $( \"#dis\" ).load(window.location.href + \" #dis\" ); {Connection: close};}</script>");   //gets value of slider and refreshes  distance div to load the
 
-            
-
- 
             client.println("</body></html>");
 
 
@@ -387,4 +349,98 @@ void webpage() {
     Serial.println("Client disconnected.");
     Serial.println("");
   }
+}
+void servoMove(int servoPos) {
+  Wire.beginTransmission(uno); // transmit to device #4
+  Wire.write(byte(move_servo));              // sends one byte
+  Wire.write(servoPos); //send servo position to slave
+  Wire.endTransmission();    // stop transmitting
+  delay(100);   //gives time to slave to get data ready
+  Wire.requestFrom(uno, 6);    // request 10 bytes from slave device
+
+  //get all data from slave
+  for (int i = 0; i < 5; i++) {
+    ultraSonicDist[i] = Wire.read();
+  }
+  Serial.println(ultraSonicDist);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Dist: ");
+  lcd.print(ultraSonicDist);
+}
+void getDHT_Data() {
+  Wire.beginTransmission(uno); // transmit to device
+  Wire.write(byte(get_sensData));              // sends one byte
+  Wire.endTransmission();    // stop transmitting
+
+  Wire.requestFrom(uno, 10);    // request 10 bytes from slave device
+
+  //get all data from slave
+  for (int i = 0; i < 10; i++) {
+    dhtdata[i] = Wire.read();
+  }
+  Serial.println(dhtdata);
+  //split data up into temperature and humidity
+  for (int i = 0; i < 5; i++) {
+    temperature[i] = dhtdata[i]; // receive a byte as character
+  }
+  for (int i = 0; i < 5; i++) {
+    humidity[i] = dhtdata[i + 5]; // receive a byte as character
+  }
+  Serial.println(temperature);
+  Serial.println(humidity);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("T: ");
+  lcd.print(temperature);
+  lcd.setCursor(0, 1);
+  lcd.print("H: ");
+  lcd.print(humidity);
+}
+
+//bluetooth code
+void bluetooth() {
+  if (BlueTooth.available()) //Check if we receive anything from Bluetooth
+  {
+
+    //int n = ESP_BT.available();
+    BlueTooth.readBytes(bluetoothData, 20); //Read whats recevived and store in char array
+    String temp = bluetoothData;      //convert char array to string
+    Serial.print("Received:");
+    Serial.println(temp);
+    Serial.println(temp.length());
+    lcd.clear();      //print to lcd
+    lcd.print("Recieved Data:");
+    lcd.setCursor(0, 1);
+    lcd.print(temp);
+
+    if (temp == "help") {
+      BlueTooth.println('\n');
+      BlueTooth.println("Commands: ");
+      BlueTooth.println(" help "); 
+      BlueTooth.println(" get dht ");    
+      BlueTooth.println(" pan servo ");
+    } else if (temp == "get dht") {   //request dht data
+      getDHT_Data();
+      BlueTooth.println('\n');
+      BlueTooth.println(" Sensor Data: ");
+      BlueTooth.println(" Temperature: ");
+      BlueTooth.println(temperature);
+      BlueTooth.println("Humidity:");
+      BlueTooth.println(humidity);
+    } else if (temp == "pan servo") {       //move servo and get distance
+      BlueTooth.println('\n');
+      BlueTooth.println(" Servo Moving");
+      for(int i =0; i< 180; i=i+5){   
+      servoMove(i);   //moves servo and gets distances
+      BlueTooth.println(" Distance: ");
+      BlueTooth.println(ultraSonicDist);
+      }
+    } else {
+      BlueTooth.println('\n');
+      BlueTooth.println("Invalid Command");    //if invalid comman entered
+    }
+    memset(bluetoothData, 0, sizeof bluetoothData);   // empty data buffer
+  }
+
 }
