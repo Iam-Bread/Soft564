@@ -312,10 +312,10 @@ void webpage() {
             client.println("<style>body { text-align: center; font-family: \"Trebuchet MS\", Arial; margin-left:auto; margin-right:auto;}");
             client.println(".slider { width: 300px; }</style>");
             client.println("<p>Servo Position: <span id=\"servoPos\"></span></p>");
-            client.println("<input type=\"range\" min=\"0\" max=\"180\" class=\"slider\" id=\"servoSlider\" onchange=\"servo(this.value)\" value=\"" + servoPosition + "\"/>");   //slider input type position set to servo pos 
-            
+            client.println("<input type=\"range\" min=\"0\" max=\"180\" class=\"slider\" id=\"servoSlider\" onchange=\"servo(this.value)\" value=\"" + servoPosition + "\"/>");   //slider input type position set to servo pos
+
             //displays ultrasonic distance
-            client.println("<div id=\"dis\">"); //div gets updated by 
+            client.println("<div id=\"dis\">"); //div gets updated by
             client.println("<p>Distance: ");
             client.print(ultraSonicDist);
             client.print("</p>");
@@ -417,9 +417,14 @@ void bluetooth() {
     if (temp == "help") {
       BlueTooth.println('\n');
       BlueTooth.println("Commands: ");
-      BlueTooth.println(" help "); 
-      BlueTooth.println(" get dht ");    
+      BlueTooth.println(" help ");
+      BlueTooth.println(" get dht ");
       BlueTooth.println(" pan servo ");
+      BlueTooth.println(" stop ");
+      BlueTooth.println(" forwards ");
+      BlueTooth.println(" backwards ");
+      BlueTooth.println(" left ");
+      BlueTooth.println(" right ");
     } else if (temp == "get dht") {   //request dht data
       getDHT_Data();
       BlueTooth.println('\n');
@@ -431,16 +436,41 @@ void bluetooth() {
     } else if (temp == "pan servo") {       //move servo and get distance
       BlueTooth.println('\n');
       BlueTooth.println(" Servo Moving");
-      for(int i =0; i< 180; i=i+5){   
-      servoMove(i);   //moves servo and gets distances
-      BlueTooth.println(" Distance: ");
-      BlueTooth.println(ultraSonicDist);
+      for (int i = 0; i < 180; i = i + 5) {
+        servoMove(i);   //moves servo and gets distances
+        BlueTooth.println(" Distance: ");
+        BlueTooth.println(ultraSonicDist);
       }
-    } else {
-      BlueTooth.println('\n');
-      BlueTooth.println("Invalid Command");    //if invalid comman entered
+      } else if (temp == "stop") {                  //stop motors
+        Wire.beginTransmission(uno);                // transmit to device #4
+        Wire.write(byte(motor_stop));               // sends one byte
+        Wire.endTransmission();                     // stop transmitting
+        BlueTooth.println(" Stopping ");
+      } else if (temp == "forwards") {              //move motors forwards
+        Wire.beginTransmission(uno);                // transmit to device #4
+        Wire.write(byte(motor_forward));               // sends one byte
+        Wire.endTransmission();                     // stop transmitting
+        BlueTooth.println(" Going Forwards ");
+      } else if (temp == "backwards") {             //move motors backwards
+        Wire.beginTransmission(uno);                // transmit to device #4
+        Wire.write(byte(motor_backward));               // sends one byte
+        Wire.endTransmission();                     // stop transmitting
+        BlueTooth.println(" Going Backwards ");
+      } else if (temp == "left") {                  //move motors left
+        Wire.beginTransmission(uno);                // transmit to device #4
+        Wire.write(byte(motor_left));               // sends one byte
+        Wire.endTransmission();                     // stop transmitting
+        BlueTooth.println(" Turning Left ");
+      } else if (temp == "right") {                 //move motors righ
+        Wire.beginTransmission(uno);                // transmit to device #4
+        Wire.write(byte(motor_right));               // sends one byte
+        Wire.endTransmission();                     // stop transmitting
+        BlueTooth.println(" Turning Right ");
+      } else {
+        BlueTooth.println('\n');
+        BlueTooth.println("Invalid Command");    //if invalid comman entered
+      }
+      memset(bluetoothData, 0, sizeof bluetoothData);   // empty data buffer
     }
-    memset(bluetoothData, 0, sizeof bluetoothData);   // empty data buffer
-  }
 
-}
+  }
