@@ -94,7 +94,7 @@ void setup() {
   }
   lcd.clear();
   if (WiFi.status() == WL_CONNECTED) {            //if connected to wifi
-    // Print local IP address and start web server
+    // Print IP address and start web server
     Serial.println("");
     Serial.println("WiFi connected.");
     Serial.println("IP address: ");
@@ -102,21 +102,20 @@ void setup() {
     server.begin();
     lcd.print(WiFi.localIP());
   } else {       //if not connected to wifi
-    Serial.println("cant connect to WiFi");
+    Serial.println("Cant connect to WiFi");
     lcd.print("   Connect to   ");
     lcd.setCursor(0, 1);
     lcd.print("    Bluetooth   ");
     BlueTooth.begin("Soft564 Robot");
-    Serial.println("connect via BlueTooth");
+    Serial.println("Connect via BlueTooth");
   }
 }
 
 void loop() {
   if (WiFi.status() == WL_CONNECTED) {  //if connected to wifi
     webpage();
-  } else {
-
-    bluetooth();
+  } else {                              //if not connected to wifi
+    bluetooth();        
 
   }
 }
