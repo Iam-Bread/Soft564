@@ -99,14 +99,14 @@ void setup() {
     Serial.println("WiFi connected.");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
-    server.begin();
+    server.begin();                       //start the server
     lcd.print(WiFi.localIP());
   } else {       //if not connected to wifi
     Serial.println("Cant connect to WiFi");
     lcd.print("   Connect to   ");
     lcd.setCursor(0, 1);
     lcd.print("    Bluetooth   ");
-    BlueTooth.begin("Soft564 Robot");
+    BlueTooth.begin("Soft564 Robot");       //start bluetooth 
     Serial.println("Connect via BlueTooth");
   }
 }

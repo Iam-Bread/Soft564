@@ -142,7 +142,6 @@ void receiveEvent(int bytes) {
 
 void requestEvent() {
   if (command == get_sensData) {      //Check was previous command sent was if sens data
-   // Serial.println("sending dht");
     Wire.write(dhtemperature);      // send data from dht sensor
     Wire.write(dhthumidity);
   } else if (command == move_servo) {   //if previous command was move servo
