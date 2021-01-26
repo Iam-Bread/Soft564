@@ -142,7 +142,7 @@ void receiveEvent(int bytes) {
 
 void requestEvent() {
   if (command == get_sensData) {      //Check was previous command sent was if sens data
-    Serial.println("sending dht");
+   // Serial.println("sending dht");
     Wire.write(dhtemperature);      // send data from dht sensor
     Wire.write(dhthumidity);
   } else if (command == move_servo) {   //if previous command was move servo
@@ -196,30 +196,35 @@ void loop() {
           motorBackward = false;
           motorLeft = false;
           motorRight = false;
+          //Serial.println("stop");
           break;
         case 0xFF18E7: //^
           motorForward = true;
           motorBackward = false;
           motorLeft = false;
           motorRight = false;
+         // Serial.println("forwards");
           break;
         case  0xFF10EF:  //>
           motorForward = false;
           motorBackward = false;
           motorLeft = true;
           motorRight = false;
+         // Serial.println("left");
           break;
         case  0XFF5AA5:  //<
           motorForward = false;
           motorBackward = false;
           motorLeft = false;
           motorRight = true;
+         // Serial.println("right");
           break;
         case  0xFF4AB5:  //V
           motorForward = false;
           motorBackward = true;
           motorLeft = false;
           motorRight = false;
+         // Serial.println("backwards");
           break;
       }
     }
